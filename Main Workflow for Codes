@@ -1,0 +1,107 @@
+
+```{r}
+world_castles <- tuesdata$world_castles
+```
+
+```{r}
+library(ggplot2)
+library(tidyr)
+
+ggplot(world_castles, aes(x = category)) +
+  geom_bar() +
+  labs(
+    title = "Number of Castles by Category",
+    x = "Category",
+    y = "Count"
+  )
+```
+
+
+```{r}
+ggplot(world_castles, aes(x = century)) +
+  geom_bar() +
+  labs(
+    title = "Number of Landmarks by Century",
+    x = "Century",
+    y = "Count"
+  ) +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1)
+  )
+
+ggplot(country_counts, aes(x = reorder(country, n), y = n)) +
+  geom_col() +
+  coord_flip() +
+  labs(
+    title = "Top 10 Countries by Number of Landmarks",
+    x = "Country",
+    y = "Count"
+  )
+```
+
+
+
+```{r}
+ggplot(world_castles, aes(x = year_approx)) +
+  geom_bar() +
+  labs(
+    title = "Founding Year Approximation",
+    x = "Type of founding year: 1: estimate, 0: documented date",
+    y = "Count"
+  )
+```
+
+
+```{r}
+ggplot(world_castles, aes(x = lat)) +
+  geom_histogram() +
+  labs(
+    title = "Distribution of Landmark Latitude",
+    x = "Latitude",
+    y = "Count"
+  )
+```
+
+
+```{r}
+ggplot(world_castles, aes(x = lon)) +
+  geom_histogram() +
+  labs(
+    title = "Distribution of Landmark Longtitude",
+    x = "Longtitude",
+    y = "Count"
+  )
+```
+
+
+```{r}
+ggplot(world_castles, aes(x = year)) +
+  geom_histogram() +
+  labs(
+    title = "Distribution of Landmark Founding Year",
+    x = "Year",
+    y = "Count"
+  )
+```
+
+
+```{r}
+ggplot(world_castles, aes(x = sitelinks)) +
+  geom_histogram() +
+  labs(
+    title = "Distribution of Wikipedia Sitelinks",
+    x = "Number of Sitelinks",
+    y = "Count"
+  )
+```
+
+
+```{r}
+ggplot(world_castles, aes(x = pageviews)) +
+  geom_histogram() +
+  labs(
+    title = "Distribution of Wikipedia Pageviews",
+    x = "Pageviews",
+    y = "Count"
+  )
+```
