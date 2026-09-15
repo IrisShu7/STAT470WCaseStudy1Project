@@ -1,0 +1,403 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+This is an [R Markdown](http://rmarkdown.rstudio.com) Notebook. When you execute code within the notebook, the results appear beneath the code. 
+
+Try executing this chunk by clicking the *Run* button within the chunk or by placing your cursor inside it and pressing *Cmd+Shift+Enter*. 
+
+```{r}
+# ============================================================
+# WORLD CASTLES DATASET: EXPLORATORY DATA ANALYSIS (EDA)
+# ============================================================
+
+
+# ============================================================
+# SETUP: LOAD PACKAGES AND DATA
+# ============================================================
+
+# Run once if tidyverse is not installed:
+# install.packages("tidyverse")
+
+library(tidyverse)
+
+world_castles <- read_csv(
+  "https://raw.githubusercontent.com/rfordatascience/tidytuesday/main/data/2026/2026-09-01/world_castles.csv",
+  show_col_types = FALSE
+)
+
+theme_set(theme_minimal(base_size = 12))
+
+
+# ============================================================
+# EDA 1: DATA STRUCTURE, MISSING VALUES, AND DUPLICATE IDs
+# Question: What does the dataset contain, and is anything missing?
+# ============================================================
+
+dim(world_castles)
+names(world_castles)
+glimpse(world_castles)
+summary(world_castles)
+
+# Count missing values in each column
+missing_table <- world_castles %>%
+  summarise(across(everything(), ~ sum(is.na(.x)))) %>%
+  pivot_longer(
+    cols = everything(),
+    names_to = "variable",
+    values_to = "missing_count"
+  ) %>%
+  mutate(
+    missing_percent = round(
+      100 * missing_count / nrow(world_castles), 2
+    )
+  ) %>%
+  arrange(desc(missing_count))
+
+print(missing_table)
+
+# Check for repeated landmark IDs
+duplicate_ids <- world_castles %>%
+  filter(!is.na(qid)) %>%
+  count(qid, sort = TRUE) %>%
+  filter(n > 1)
+
+print(duplicate_ids)
+
+
+# ============================================================
+# EDA 2: FREQUENCY TABLE AND BAR CHART
+# Question: Which landmark type is most common?
+# ============================================================
+
+category_counts <- world_castles %>%
+  filter(!is.na(category)) %>%
+  count(category, sort = TRUE) %>%
+  mutate(percent = round(100 * n / sum(n), 1))
+
+print(category_counts)
+
+p2 <- ggplot(
+  category_counts,
+  aes(x = reorder(category, n), y = n)
+) +
+  geom_col(fill = "steelblue") +
+  coord_flip() +
+  labs(
+    title = "Number of Landmarks by Type",
+    x = "Landmark type",
+    y = "Number recorded"
+  )
+
+print(p2)
+
+# Interpretation:
+# The longest bar represents the most common landmark type.
+
+
+# ============================================================
+# EDA 3: RANKED BAR CHART
+# Question: Which countries have the most recorded castles?
+# ============================================================
+
+country_castles <- world_castles %>%
+  filter(category == "castle", !is.na(country)) %>%
+  count(country, sort = TRUE)
+
+top10_castles <- country_castles %>%
+  slice_max(n, n = 10, with_ties = FALSE)
+
+print(top10_castles)
+
+p3 <- ggplot(
+  top10_castles,
+  aes(x = reorder(country, n), y = n)
+) +
+  geom_col(fill = "darkcyan") +
+  coord_flip() +
+  labs(
+    title = "Top 10 Countries by Recorded Castle Count",
+    x = "Country",
+    y = "Number of castles"
+  )
+
+print(p3)
+
+# Interpretation:
+# This counts only records classified as castles.
+# It does not include palaces, fortresses, or ruins.
+
+
+# ============================================================
+# EDA 4: NUMERICAL SUMMARIES AND HISTOGRAM
+# Question: When were landmarks founded?
+# ============================================================
+
+dated_landmarks <- world_castles %>%
+  filter(!is.na(year))
+
+year_summary <- dated_landmarks %>%
+  summarise(
+    n = n(),
+    earliest_year = min(year),
+    Q1 = quantile(year, 0.25),
+    median_year = median(year),
+    mean_year = mean(year),
+    Q3 = quantile(year, 0.75),
+    latest_year = max(year),
+    SD_year = sd(year)
+  )
+
+print(year_summary)
+
+p4 <- ggplot(dated_landmarks, aes(x = year)) +
+  geom_histogram(
+    binwidth = 100,
+    fill = "steelblue",
+    color = "white"
+  ) +
+  labs(
+    title = "Distribution of Landmark Founding Years",
+    subtitle = "100-year intervals; negative years indicate BC",
+    x = "Founding year",
+    y = "Number of landmarks"
+  )
+
+print(p4)
+
+# Interpretation:
+# Taller bars show intervals containing more founding dates.
+# These intervals are not necessarily named historical centuries.
+
+
+# ============================================================
+# EDA 5: GROUP SUMMARIES AND BOXPLOTS
+# Question: Are palaces newer than fortresses?
+# ============================================================
+
+palace_fortress <- world_castles %>%
+  filter(
+    category %in% c("palace", "fortress"),
+    !is.na(year)
+  )
+
+type_year_summary <- palace_fortress %>%
+  group_by(category) %>%
+  summarise(
+    n = n(),
+    mean_year = mean(year),
+    median_year = median(year),
+    SD_year = sd(year),
+    IQR_year = IQR(year),
+    .groups = "drop"
+  )
+
+print(type_year_summary)
+
+p5 <- ggplot(
+  palace_fortress,
+  aes(x = category, y = year, fill = category)
+) +
+  geom_boxplot(alpha = 0.75) +
+  labs(
+    title = "Founding Years: Palaces and Fortresses",
+    x = "Landmark type",
+    y = "Founding year"
+  ) +
+  theme(legend.position = "none")
+
+print(p5)
+
+# Interpretation:
+# A higher median founding year means the typical landmark is newer.
+# Boxplots alone do not establish statistical significance.
+
+
+# ============================================================
+# EDA 6: GROUPED BAR CHART BY CENTURY
+# Question: How do castle and palace counts vary by century?
+# ============================================================
+
+# Arrange century labels chronologically using founding years
+century_order <- world_castles %>%
+  filter(!is.na(century), !is.na(year)) %>%
+  group_by(century) %>%
+  summarise(first_year = min(year), .groups = "drop") %>%
+  arrange(first_year) %>%
+  pull(century)
+
+century_counts <- world_castles %>%
+  filter(
+    category %in% c("castle", "palace"),
+    !is.na(century),
+    century %in% century_order
+  ) %>%
+  mutate(
+    century = factor(century, levels = century_order)
+  ) %>%
+  count(century, category)
+
+print(century_counts)
+
+p6 <- ggplot(
+  century_counts,
+  aes(x = century, y = n, fill = category)
+) +
+  geom_col(position = "dodge") +
+  labs(
+    title = "Castles and Palaces Founded by Century",
+    x = "Century",
+    y = "Number recorded",
+    fill = "Landmark type"
+  ) +
+  theme(
+    axis.text.x = element_text(angle = 60, hjust = 1)
+  )
+
+print(p6)
+
+# Interpretation:
+# Compare castle and palace counts within each century.
+# Look for differences in when their recorded counts peak.
+
+
+# ============================================================
+# EDA 7: PROPORTIONAL STACKED BAR CHART
+# Question: Does landmark composition differ by country?
+# ============================================================
+
+# Select countries with the most classified landmarks
+top_countries <- world_castles %>%
+  filter(!is.na(country), !is.na(category)) %>%
+  count(country, sort = TRUE) %>%
+  slice_max(n, n = 10, with_ties = FALSE) %>%
+  pull(country)
+
+country_types <- world_castles %>%
+  filter(
+    country %in% top_countries,
+    !is.na(category)
+  ) %>%
+  count(country, category) %>%
+  mutate(
+    country = factor(country, levels = rev(top_countries))
+  )
+
+# Display counts and percentages within each country
+country_percentages <- country_types %>%
+  group_by(country) %>%
+  mutate(percent = round(100 * n / sum(n), 1)) %>%
+  ungroup()
+
+print(country_percentages)
+
+p7 <- ggplot(
+  country_types,
+  aes(x = country, y = n, fill = category)
+) +
+  geom_col(position = "fill") +
+  coord_flip() +
+  scale_y_continuous(labels = scales::label_percent()) +
+  labs(
+    title = "Landmark Composition by Country",
+    subtitle = "Top 10 countries by classified landmark count",
+    x = "Country",
+    y = "Percentage of classified landmarks",
+    fill = "Landmark type"
+  )
+
+print(p7)
+
+# Interpretation:
+# Each country's bar totals 100%.
+# Segment sizes represent proportions, not absolute counts.
+
+
+# ============================================================
+# EDA 8: SCATTERPLOT AND SPEARMAN CORRELATION
+# Question: Do landmarks with more Wikipedia language editions
+# tend to receive more pageviews?
+# ============================================================
+
+popularity_data <- world_castles %>%
+  filter(
+    !is.na(sitelinks),
+    !is.na(pageviews),
+    sitelinks >= 0,
+    pageviews >= 0
+  )
+
+p8 <- ggplot(
+  popularity_data,
+  aes(
+    x = log10(sitelinks + 1),
+    y = log10(pageviews + 1),
+    color = category
+  )
+) +
+  geom_point(alpha = 0.45, size = 1.8) +
+  labs(
+    title = "Wikipedia Language Coverage and Pageviews",
+    subtitle = "Log transformations make large ranges easier to view",
+    x = "log10(Language editions + 1)",
+    y = "log10(Pageviews + 1)",
+    color = "Landmark type"
+  )
+
+print(p8)
+
+spearman_correlation <- cor(
+  popularity_data$sitelinks,
+  popularity_data$pageviews,
+  method = "spearman"
+)
+
+print(spearman_correlation)
+
+# Interpretation:
+# A positive correlation suggests that greater language coverage
+# tends to accompany more pageviews.
+# Correlation does not establish causation.
+
+
+# ============================================================
+# EDA 8 EXTENSION: MANY LANGUAGE EDITIONS BUT FEW PAGEVIEWS
+# ============================================================
+
+# Exploratory definitions:
+# "Many editions" = at or above the 75th percentile
+# "Few pageviews" = at or below the 25th percentile
+
+high_languages <- quantile(
+  popularity_data$sitelinks, 0.75
+)
+
+low_views <- quantile(
+  popularity_data$pageviews, 0.25
+)
+
+many_languages_few_views <- popularity_data %>%
+  filter(
+    sitelinks >= high_languages,
+    pageviews <= low_views
+  ) %>%
+  select(name, country, category, sitelinks, pageviews) %>%
+  arrange(desc(sitelinks), pageviews)
+
+print(many_languages_few_views, n = 20)
+
+# No matching rows is a valid result under these thresholds.
+
+
+# ============================================================
+# END OF EDA
+# ============================================================
+```
+
+Add a new chunk by clicking the *Insert Chunk* button on the toolbar or by pressing *Cmd+Option+I*.
+
+When you save the notebook, an HTML file containing the code and output will be saved alongside it (click the *Preview* button or press *Cmd+Shift+K* to preview the HTML file). 
+
+The preview shows you a rendered HTML copy of the contents of the editor. Consequently, unlike *Knit*, *Preview* does not run any R code chunks. Instead, the output of the chunk when it was last run in the editor is displayed.
+
